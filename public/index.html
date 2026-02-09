@@ -17,10 +17,27 @@
             <h2>Bienvenido</h2>
             <div class="home-content">
                 <input type="text" id="player-name" placeholder="Tu nombre" maxlength="20">
-                <button id="create-game-btn" class="btn btn-primary">Crear Sala</button>
-                <div class="divider">O</div>
-                <input type="text" id="game-code-input" placeholder="Código de sala" maxlength="6">
-                <button id="join-game-btn" class="btn btn-secondary">Unirse a Sala</button>
+                
+                <div class="game-mode-selector">
+                    <h3>Selecciona el modo de juego:</h3>
+                    <div class="mode-buttons">
+                        <button id="single-player-btn" class="btn btn-mode">🤖 Un Jugador (Con Bots)</button>
+                        <button id="multiplayer-btn" class="btn btn-mode">👥 Multijugador Online</button>
+                    </div>
+                </div>
+                
+                <div id="multiplayer-options" class="hidden">
+                    <button id="create-game-btn" class="btn btn-primary">Crear Sala</button>
+                    <div class="divider">O</div>
+                    <input type="text" id="game-code-input" placeholder="Código de sala" maxlength="6">
+                    <button id="join-game-btn" class="btn btn-secondary">Unirse a Sala</button>
+                </div>
+                
+                <div id="single-player-options" class="hidden">
+                    <label for="bot-count">Número de bots (5-19):</label>
+                    <input type="number" id="bot-count" min="5" max="19" value="7">
+                    <button id="start-single-player-btn" class="btn btn-primary">Iniciar Partida</button>
+                </div>
             </div>
         </div>
 
