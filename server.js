@@ -5,7 +5,12 @@ const io = require('socket.io')(http);
 const path = require('path');
 
 // Servir archivos estáticos
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Ruta principal
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // Estado del juego
 const games = new Map();
