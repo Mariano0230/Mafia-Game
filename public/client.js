@@ -3,6 +3,8 @@ const socket = io();
 let gameCode = null;
 let myRole = null;
 let isHost = false;
+let isSinglePlayer = false;
+let singlePlayerGame = null;
 
 // Definición de roles
 const ROLES = {
@@ -29,6 +31,9 @@ const ROLES = {
 };
 
 // Event Listeners - Home Screen
+document.getElementById('single-player-btn').addEventListener('click', selectSinglePlayer);
+document.getElementById('multiplayer-btn').addEventListener('click', selectMultiplayer);
+document.getElementById('start-single-player-btn').addEventListener('click', startSinglePlayerGame);
 document.getElementById('create-game-btn').addEventListener('click', createGame);
 document.getElementById('join-game-btn').addEventListener('click', joinGame);
 document.getElementById('leave-lobby-btn').addEventListener('click', leaveLobby);
@@ -418,4 +423,448 @@ function showError(message) {
     setTimeout(() => {
         errorEl.classList.add('hidden');
     }, 3000);
+}
+
+// ============================================
+// MODO UN JUGADOR CON BOTS
+// ============================================
+
+function selectSinglePlayer() {
+    isSinglePlayer = true;
+    document.getElementById('single-player-btn').classList.add('active');
+    document.getElementById('multiplayer-btn').classList.remove('active');
+    document.getElementById('multiplayer-options').classList.add('hidden');
+    document.getElementById('single-player-options').classList.remove('hidden');
+}
+
+function selectMultiplayer() {
+    isSinglePlayer = false;
+    document.getElementById('multiplayer-btn').classList.add('active');
+    document.getElementById('single-player-btn').classList.remove('active');
+    document.getElementById('single-player-options').classList.add('hidden');
+    document.getElementById('multiplayer-options').classList.remove('hidden');
+}
+
+function startSinglePlayerGame() {
+    const playerName = document.getElementById('player-name').value.trim() || 'Jugador';
+    const botCount = parseInt(document.getElementById('bot-count').value);
+    
+    if (botCount < 5 || botCount > 19) {
+        showError('El número de bots debe estar entre 5 y 19');
+        return;
+    }
+    
+    // Crear juego local con bots
+    singlePlayerGame = new SinglePlayerGame(playerName, botCount);
+    singlePlayerGame.start();
+}
+
+class SinglePlayerGame {
+    constructor(playerName, botCount) {
+        this.players = [];
+        this.round = 1;
+        this.nightActions = {};
+        this.playerName = playerName;
+        
+        // Crear jugador humano
+        this.players.push({
+            id: 'human',
+            name: playerName,
+            role: null,
+            alive: true,
+            isBot: false
+        });
+        
+        // Crear bots
+        const botNames = [
+            'Bot Alpha', 'Bot Beta', 'Bot Gamma', 'Bot Delta', 'Bot Epsilon',
+            'Bot Zeta', 'Bot Eta', 'Bot Theta', 'Bot Iota', 'Bot Kappa',
+            'Bot Lambda', 'Bot Mu', 'Bot Nu', 'Bot Xi', 'Bot Omicron',
+            'Bot Pi', 'Bot Rho', 'Bot Sigma', 'Bot Tau'
+        ];
+        
+        for (let i = 0; i < botCount; i++) {
+            this.players.push({
+                id: `bot-${i}`,
+                name: botNames[i],
+                role: null,
+                alive: true,
+                isBot: true
+            });
+        }
+        
+        this.assignRoles();
+    }
+    
+    assignRoles() {
+        const playerCount = this.players.length;
+        const mafiaCount = Math.floor(playerCount / 3);
+        
+        const roles = [];
+        for (let i = 0; i < mafiaCount; i++) roles.push('MAFIA');
+        roles.push('POLICE');
+        roles.push('HEALER');
+        while (roles.length < playerCount) roles.push('TOWN');
+        
+        // Mezclar roles
+        for (let i = roles.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [roles[i], roles[j]] = [roles[j], roles[i]];
+        }
+        
+        this.players.forEach((player, index) => {
+            player.role = roles[index];
+        });
+    }
+    
+    start() {
+        const humanPlayer = this.players.find(p => !p.isBot);
+        myRole = humanPlayer.role;
+        
+        // Mostrar rol del jugador
+        showScreen('role-screen');
+        const role = ROLES[myRole];
+        document.getElementById('role-title').textContent = `${role.emoji} ${role.name}`;
+        document.getElementById('role-description').textContent = role.description;
+        
+        if (myRole === 'MAFIA') {
+            const mafiaMembers = this.players.filter(p => p.role === 'MAFIA' && p.isBot);
+            if (mafiaMembers.length > 0) {
+                document.getElementById('mafia-members').classList.remove('hidden');
+                const list = document.getElementById('mafia-list');
+                list.innerHTML = '';
+                mafiaMembers.forEach(member => {
+                    const li = document.createElement('li');
+                    li.textContent = member.name;
+                    list.appendChild(li);
+                });
+            }
+        }
+        
+        // Cambiar el botón de "Estoy listo" para iniciar la noche
+        document.getElementById('ready-btn').textContent = 'Comenzar Noche';
+        document.getElementById('ready-btn').onclick = () => this.startNight();
+        document.getElementById('waiting-players').classList.add('hidden');
+    }
+    
+    startNight() {
+        this.nightActions = {
+            mafiaTarget: null,
+            policeTarget: null,
+            healerTarget: null
+        };
+        
+        showScreen('night-screen');
+        document.getElementById('round-number').textContent = this.round;
+        
+        // Los bots toman decisiones automáticamente
+        this.botsMakeDecisions();
+        
+        // Mostrar turno del jugador humano
+        const alivePlayers = this.players.filter(p => p.alive && p.id !== 'human');
+        const allAlivePlayers = this.players.filter(p => p.alive);
+        
+        if (myRole === 'MAFIA' && this.players.find(p => p.id === 'human').alive) {
+            this.showMafiaTurn(alivePlayers);
+        } else if (myRole === 'POLICE' && this.players.find(p => p.id === 'human').alive) {
+            this.showPoliceTurn(alivePlayers);
+        } else if (myRole === 'HEALER' && this.players.find(p => p.id === 'human').alive) {
+            this.showHealerTurn(allAlivePlayers);
+        } else {
+            document.getElementById('your-turn').classList.add('hidden');
+            document.getElementById('waiting-turn').classList.remove('hidden');
+            setTimeout(() => this.processNight(), 2000);
+        }
+    }
+    
+    botsMakeDecisions() {
+        const alivePlayers = this.players.filter(p => p.alive);
+        
+        // Bots mafia eligen objetivo
+        const mafias = this.players.filter(p => p.role === 'MAFIA' && p.isBot && p.alive);
+        if (mafias.length > 0) {
+            const targets = alivePlayers.filter(p => p.role !== 'MAFIA');
+            if (targets.length > 0) {
+                // Bots intentan eliminar primero al policía o curandero si los conocen (simulación inteligente)
+                const priority = targets.find(p => p.role === 'POLICE' || p.role === 'HEALER');
+                this.nightActions.mafiaTarget = priority ? priority.id : targets[Math.floor(Math.random() * targets.length)].id;
+            }
+        }
+        
+        // Bot policía elige objetivo
+        const police = this.players.find(p => p.role === 'POLICE' && p.isBot && p.alive);
+        if (police) {
+            const suspects = alivePlayers.filter(p => p.id !== police.id);
+            if (suspects.length > 0) {
+                this.nightActions.policeTarget = suspects[Math.floor(Math.random() * suspects.length)].id;
+            }
+        }
+        
+        // Bot curandero elige objetivo (puede protegerse a sí mismo)
+        const healer = this.players.find(p => p.role === 'HEALER' && p.isBot && p.alive);
+        if (healer) {
+            // 40% de probabilidad de protegerse a sí mismo
+            if (Math.random() < 0.4) {
+                this.nightActions.healerTarget = healer.id;
+            } else {
+                const targets = alivePlayers.filter(p => p.id !== healer.id);
+                if (targets.length > 0) {
+                    this.nightActions.healerTarget = targets[Math.floor(Math.random() * targets.length)].id;
+                }
+            }
+        }
+    }
+    
+    showMafiaTurn(targets) {
+        document.getElementById('your-turn').classList.remove('hidden');
+        document.getElementById('waiting-turn').classList.add('hidden');
+        
+        document.getElementById('turn-instruction').innerHTML = `
+            <h3>🔫 Turno de la Mafia</h3>
+            <p>Selecciona a tu víctima:</p>
+        `;
+        
+        this.renderPlayerCards(targets, (targetId) => {
+            this.nightActions.mafiaTarget = targetId;
+            this.processNight();
+        });
+    }
+    
+    showPoliceTurn(targets) {
+        document.getElementById('your-turn').classList.remove('hidden');
+        document.getElementById('waiting-turn').classList.add('hidden');
+        
+        document.getElementById('turn-instruction').innerHTML = `
+            <h3>👮 Turno del Policía</h3>
+            <p>Selecciona a un sospechoso para investigar:</p>
+        `;
+        
+        this.renderPlayerCards(targets, (targetId) => {
+            this.nightActions.policeTarget = targetId;
+            this.processNight();
+        });
+    }
+    
+    showHealerTurn(targets) {
+        document.getElementById('your-turn').classList.remove('hidden');
+        document.getElementById('waiting-turn').classList.add('hidden');
+        
+        document.getElementById('turn-instruction').innerHTML = `
+            <h3>⚕️ Turno del Curandero</h3>
+            <p>Selecciona a quién proteger (puedes protegerte a ti mismo):</p>
+        `;
+        
+        this.renderPlayerCards(targets, (targetId) => {
+            this.nightActions.healerTarget = targetId;
+            this.processNight();
+        });
+    }
+    
+    renderPlayerCards(players, onSelect) {
+        const container = document.getElementById('target-players');
+        container.innerHTML = '';
+        
+        players.forEach(player => {
+            const card = document.createElement('div');
+            card.className = 'player-card';
+            card.innerHTML = `<div class="player-name">${player.name}</div>`;
+            card.addEventListener('click', () => {
+                document.querySelectorAll('.player-card').forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                setTimeout(() => onSelect(player.id), 300);
+            });
+            container.appendChild(card);
+        });
+    }
+    
+    processNight() {
+        const results = [];
+        let needsVote = false;
+        
+        // Procesar asesinato de mafia
+        if (this.nightActions.mafiaTarget) {
+            const victim = this.players.find(p => p.id === this.nightActions.mafiaTarget);
+            
+            if (this.nightActions.healerTarget === this.nightActions.mafiaTarget) {
+                results.push({
+                    type: 'save',
+                    text: `💚 ¡El curandero salvó a ${victim.name}! La mafia intentó asesinarlos pero fueron protegidos.`
+                });
+            } else {
+                victim.alive = false;
+                results.push({
+                    type: 'death',
+                    text: `💀 ${victim.name} fue asesinado por la mafia. Era ${ROLES[victim.role].emoji} ${ROLES[victim.role].name}.`
+                });
+            }
+        }
+        
+        // Procesar investigación del policía
+        if (this.nightActions.policeTarget) {
+            const suspect = this.players.find(p => p.id === this.nightActions.policeTarget);
+            
+            if (suspect.role === 'MAFIA') {
+                suspect.alive = false;
+                results.push({
+                    type: 'capture',
+                    text: `🚨 ¡El policía capturó a ${suspect.name}! Era un mafioso.`
+                });
+            } else {
+                results.push({
+                    type: 'miss',
+                    text: `🔍 El policía investigó a ${suspect.name}, pero no es un mafioso.`
+                });
+                needsVote = true;
+            }
+        }
+        
+        this.showResults(results, needsVote);
+    }
+    
+    showResults(results, needsVote) {
+        showScreen('results-screen');
+        
+        const container = document.getElementById('results-content');
+        container.innerHTML = '';
+        
+        results.forEach(result => {
+            const div = document.createElement('div');
+            div.className = `result-item ${result.type}`;
+            div.innerHTML = `<p>${result.text}</p>`;
+            container.appendChild(div);
+        });
+        
+        // Mostrar jugadores vivos
+        const aliveContainer = document.getElementById('alive-players');
+        aliveContainer.innerHTML = '';
+        this.players.filter(p => p.alive).forEach(player => {
+            const span = document.createElement('span');
+            span.className = 'alive-player';
+            span.textContent = player.name;
+            aliveContainer.appendChild(span);
+        });
+        
+        // Verificar condiciones de victoria
+        const winner = this.checkWinConditions();
+        if (winner) {
+            setTimeout(() => this.endGame(winner), 3000);
+            return;
+        }
+        
+        if (needsVote) {
+            setTimeout(() => this.showVoting(), 3000);
+        } else {
+            setTimeout(() => {
+                this.round++;
+                this.startNight();
+            }, 3000);
+        }
+    }
+    
+    showVoting() {
+        showScreen('vote-screen');
+        
+        const alivePlayers = this.players.filter(p => p.alive);
+        const container = document.getElementById('vote-players');
+        container.innerHTML = '';
+        
+        // Los bots votan aleatoriamente
+        const botVotes = {};
+        const bots = alivePlayers.filter(p => p.isBot);
+        bots.forEach(bot => {
+            const targets = alivePlayers.filter(p => p.id !== bot.id);
+            if (targets.length > 0) {
+                const target = targets[Math.floor(Math.random() * targets.length)];
+                botVotes[target.id] = (botVotes[target.id] || 0) + 1;
+            }
+        });
+        
+        alivePlayers.forEach(player => {
+            const card = document.createElement('div');
+            card.className = 'player-card';
+            card.innerHTML = `<div class="player-name">${player.name}</div>`;
+            card.addEventListener('click', () => {
+                document.querySelectorAll('.player-card').forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                setTimeout(() => {
+                    // Agregar voto del jugador humano
+                    botVotes[player.id] = (botVotes[player.id] || 0) + 1;
+                    this.processVoting(botVotes);
+                }, 300);
+            });
+            container.appendChild(card);
+        });
+        
+        document.getElementById('skip-vote-btn').onclick = () => {
+            this.round++;
+            this.startNight();
+        };
+    }
+    
+    processVoting(votes) {
+        let maxVotes = 0;
+        let expelled = null;
+        
+        for (const [playerId, count] of Object.entries(votes)) {
+            if (count > maxVotes) {
+                maxVotes = count;
+                expelled = playerId;
+            }
+        }
+        
+        if (expelled) {
+            const player = this.players.find(p => p.id === expelled);
+            player.alive = false;
+            
+            const results = [{
+                type: 'expel',
+                text: `🗳️ ${player.name} fue expulsado por votación. Era ${ROLES[player.role].emoji} ${ROLES[player.role].name}.`
+            }];
+            
+            this.showResults(results, false);
+        }
+    }
+    
+    checkWinConditions() {
+        const alivePlayers = this.players.filter(p => p.alive);
+        const aliveMafia = alivePlayers.filter(p => p.role === 'MAFIA');
+        const aliveTown = alivePlayers.filter(p => p.role !== 'MAFIA');
+        
+        if (aliveMafia.length === 0) {
+            return 'town';
+        } else if (aliveMafia.length >= aliveTown.length) {
+            return 'mafia';
+        }
+        return null;
+    }
+    
+    endGame(winner) {
+        showScreen('end-screen');
+        
+        const title = document.getElementById('winner-title');
+        if (winner === 'town') {
+            title.textContent = '🎉 ¡EL PUEBLO GANA! 🎉';
+            title.style.color = '#28a745';
+        } else {
+            title.textContent = '🔫 ¡LA MAFIA GANA! 🔫';
+            title.style.color = '#dc3545';
+        }
+        
+        const container = document.getElementById('final-roles');
+        container.innerHTML = '';
+        
+        this.players.forEach(player => {
+            const role = ROLES[player.role];
+            const div = document.createElement('div');
+            div.className = 'final-role-item';
+            div.innerHTML = `
+                <span class="final-role-name">${player.name}</span>
+                <span class="final-role-status">
+                    <span>${role.emoji} ${role.name}</span>
+                    <span>${player.alive ? '✅' : '💀'}</span>
+                </span>
+            `;
+            container.appendChild(div);
+        });
+    }
 }
