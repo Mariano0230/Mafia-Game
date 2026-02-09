@@ -88,6 +88,49 @@ h3 {
     border-color: #667eea;
 }
 
+.game-mode-selector {
+    margin: 30px 0;
+}
+
+.game-mode-selector h3 {
+    text-align: center;
+    color: #555;
+    margin-bottom: 15px;
+    font-size: 18px;
+}
+
+.mode-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.btn-mode {
+    background: white;
+    border: 3px solid #667eea;
+    color: #667eea;
+    padding: 20px;
+    font-size: 18px;
+}
+
+.btn-mode:hover {
+    background: #667eea;
+    color: white;
+}
+
+.btn-mode.active {
+    background: #667eea;
+    color: white;
+}
+
+#single-player-options label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: bold;
+    color: #333;
+}
+
 .divider {
     text-align: center;
     margin: 20px 0;
