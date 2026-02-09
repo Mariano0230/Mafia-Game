@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juego de Mafia - Multijugador</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎭 MAFIA 🎭</h1>
+        </header>
+
+        <!-- Pantalla de inicio -->
+        <div id="home-screen" class="screen active">
+            <h2>Bienvenido</h2>
+            <div class="home-content">
+                <input type="text" id="player-name" placeholder="Tu nombre" maxlength="20">
+                <button id="create-game-btn" class="btn btn-primary">Crear Sala</button>
+                <div class="divider">O</div>
+                <input type="text" id="game-code-input" placeholder="Código de sala" maxlength="6">
+                <button id="join-game-btn" class="btn btn-secondary">Unirse a Sala</button>
+            </div>
+        </div>
+
+        <!-- Pantalla de lobby -->
+        <div id="lobby-screen" class="screen">
+            <h2>Sala: <span id="room-code"></span></h2>
+            <p class="room-link">Comparte este código con tus amigos</p>
+            
+            <h3>Jugadores en la sala:</h3>
+            <div id="lobby-players"></div>
+            
+            <div id="host-controls" class="hidden">
+                <button id="start-game-btn" class="btn btn-primary">Iniciar Juego</button>
+                <p class="min-players">Mínimo 6 jugadores</p>
+            </div>
+            
+            <button id="leave-lobby-btn" class="btn btn-secondary">Salir de la sala</button>
+        </div>
+
+        <!-- Pantalla de rol -->
+        <div id="role-screen" class="screen">
+            <h2>Tu Rol</h2>
+            <div class="role-card" id="role-card">
+                <h3 id="role-title"></h3>
+                <p id="role-description"></p>
+                <div id="mafia-members" class="hidden">
+                    <h4>Tus compañeros mafiosos:</h4>
+                    <ul id="mafia-list"></ul>
+                </div>
+            </div>
+            <button id="ready-btn" class="btn btn-primary">Estoy listo</button>
+            <div id="waiting-players" class="hidden">
+                <p>Esperando a que todos los jugadores estén listos...</p>
+                <div id="ready-list"></div>
+            </div>
+        </div>
+
+        <!-- Pantalla de noche -->
+        <div id="night-screen" class="screen">
+            <h2>🌙 Fase Nocturna - Ronda <span id="round-number">1</span></h2>
+            
+            <div id="your-turn" class="hidden">
+                <div id="turn-instruction"></div>
+                <div id="target-players" class="player-grid"></div>
+            </div>
+            
+            <div id="waiting-turn" class="hidden">
+                <p>⏳ Esperando a que otros jugadores realicen sus acciones...</p>
+            </div>
+        </div>
+
+        <!-- Pantalla de resultados -->
+        <div id="results-screen" class="screen">
+            <h2>📰 Resultados de la Noche</h2>
+            <div id="results-content"></div>
+            <div id="alive-players-section">
+                <h3>Jugadores vivos:</h3>
+                <div id="alive-players"></div>
+            </div>
+        </div>
+
+        <!-- Pantalla de votación -->
+        <div id="vote-screen" class="screen">
+            <h2>🗳️ Votación</h2>
+            <p>El policía no encontró a un mafioso. Voten para expulsar a alguien.</p>
+            <div id="vote-players" class="player-grid"></div>
+            <button id="skip-vote-btn" class="btn btn-secondary">Saltear votación</button>
+        </div>
+
+        <!-- Pantalla de fin del juego -->
+        <div id="end-screen" class="screen">
+            <h2 id="winner-title"></h2>
+            <div id="end-content">
+                <h3>Roles de los jugadores:</h3>
+                <div id="final-roles"></div>
+            </div>
+            <button id="new-game-btn" class="btn btn-primary">Nueva Partida</button>
+        </div>
+
+        <div id="error-message" class="error-toast hidden"></div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="client.js"></script>
+</body>
+</html>
